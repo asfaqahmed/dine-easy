@@ -1,0 +1,27 @@
+{
+  "name": "Customer",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Customer's full name"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Sri Lankan phone number (+94XXXXXXXXX format)"
+    },
+    "table_number": {
+      "type": "string",
+      "description": "Table number or 'takeaway'"
+    },
+    "last_order_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time customer placed an order"
+    }
+  },
+  "required": [
+    "name",
+    "phone"
+  ]
+}

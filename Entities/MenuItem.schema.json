@@ -1,0 +1,51 @@
+{
+  "name": "MenuItem",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the menu item"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the dish"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price in Sri Lankan Rupees (LKR)"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "appetizers",
+        "mains",
+        "desserts",
+        "beverages",
+        "specials"
+      ],
+      "description": "Menu category"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL to item image"
+    },
+    "is_available": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether item is currently available"
+    },
+    "preparation_time": {
+      "type": "number",
+      "description": "Estimated preparation time in minutes"
+    },
+    "ingredients": {
+      "type": "string",
+      "description": "List of main ingredients"
+    }
+  },
+  "required": [
+    "name",
+    "price",
+    "category"
+  ]
+}
