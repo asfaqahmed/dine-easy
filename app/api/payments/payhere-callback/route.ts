@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyPayHereCallback } from '@/lib/payhere';
 import { SimpleOrderModel } from '@/lib/models/OrderSimple';
 import { supabaseAdmin } from '@/lib/supabase';
+import { smsService } from '@/lib/sms';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,15 +44,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Find order by ID (PayHere sends the actual order ID, not order_number)
+    let actualOrderId = order_id;
+    
+    // Try to find order directly by ID first
+    const { data: orderCheck } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('id', order_id)
+      .single();
+    
+    // If not found by ID, try by order_number
+    if (!orderCheck) {
+      const { data: orderByNumber } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('order_number', order_id)
+        .single();
+      
+      if (orderByNumber) {
+        actualOrderId = orderByNumber.id;
+      }
+    }
+
     // Update payment transaction status in database
     const { data: paymentTransaction, error: paymentError } = await supabaseAdmin
       .from('payment_transactions')
       .update({
         status: verification.status,
-        payhere_payment_id: payment_id,
+        payment_id: payment_id,
         updated_at: new Date().toISOString()
       })
-      .eq('order_id', (await supabaseAdmin.from('orders').select('id').eq('order_number', order_id).single()).data?.id)
+      .eq('order_id', actualOrderId)
       .select(`
         *,
         orders!inner(id, customer_id, total_amount, order_number)
@@ -90,8 +114,36 @@ export async function POST(request: NextRequest) {
 
       console.log(`✅ Payment successful for order: ${order_id}, amount: ${payhere_amount} ${payhere_currency}`);
 
-      // TODO: Send SMS notification to customer about successful payment
-      // This would integrate with Send.lk API when implemented
+      // Send SMS notification to customer about successful payment
+      try {
+        // Get customer phone number from the order
+        const { data: customerData } = await supabaseAdmin
+          .from('customers')
+          .select('phone, name')
+          .eq('id', paymentTransaction.orders.customer_id)
+          .single();
+        
+        if (customerData?.phone) {
+          await smsService.sendPaymentConfirmation(
+            customerData.phone, 
+            paymentTransaction.orders.order_number, 
+            parseFloat(payhere_amount),
+            payment_id,
+            paymentTransaction.orders.id
+          );
+          
+          // Also send order confirmation SMS
+          await smsService.sendOrderConfirmation(
+            customerData.phone,
+            paymentTransaction.orders.order_number,
+            paymentTransaction.orders.total_amount,
+            paymentTransaction.orders.id
+          );
+        }
+      } catch (smsError) {
+        console.error('SMS sending failed:', smsError);
+        // Don't fail the payment process if SMS fails
+      }
       
       return NextResponse.json({ 
         status: 'success',

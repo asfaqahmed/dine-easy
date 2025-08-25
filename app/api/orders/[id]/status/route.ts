@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SimpleOrderModel } from '@/lib/models/OrderSimple';
 import { getAdminFromRequest } from '@/lib/auth';
 import { smsService } from '@/lib/sms';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function PATCH(
   request: NextRequest,
@@ -27,7 +28,7 @@ export async function PATCH(
     }
 
     // Validate status value
-    const validStatuses = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       console.error('Invalid status received:', status);
       return NextResponse.json(
@@ -59,8 +60,26 @@ export async function PATCH(
     // Send SMS notification for status updates
     try {
       if (status === 'preparing' || status === 'ready' || status === 'completed') {
-        // Note: SMS feature disabled for SimpleOrder until customer info lookup is implemented
-        console.log(`Order ${orderId} status updated to ${status} - SMS notification skipped`);
+        // Get customer phone number from the order
+        const { data: customerData } = await supabaseAdmin
+          .from('customers')
+          .select('phone, name')
+          .eq('id', currentOrder.customer_id)
+          .single();
+        
+        if (customerData?.phone) {
+          // Use the order_number from the order, or fallback to a generated one
+          const orderNumber = currentOrder.order_number || `ORD${orderId.substring(0, 8)}`;
+          
+          await smsService.sendOrderStatusUpdate(
+            customerData.phone,
+            orderNumber,
+            status,
+            orderId
+          );
+          
+          console.log(`SMS sent to ${customerData.phone} for order ${orderId} status: ${status}`);
+        }
       }
     } catch (smsError) {
       console.error('SMS sending failed:', smsError);

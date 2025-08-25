@@ -4,11 +4,17 @@ export interface SimpleOrder {
   id: string;
   customer_id: string;
   table_id?: string;
+  order_number: string;
   items: any; // JSON data
+  subtotal?: number;
+  tax_amount?: number;
   total_amount: number;
-  status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
   payment_status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  payment_method?: string;
   payment_id?: string;
+  special_instructions?: string;
+  estimated_ready_time?: Date;
   estimated_time?: number;
   created_at: Date;
   updated_at: Date;
@@ -30,15 +36,21 @@ export class SimpleOrderModel {
     total_amount: number;
   }): Promise<SimpleOrder> {
     try {
+      // Generate order number
+      const orderNumber = `ORD${Date.now()}`;
+      
       const { data: order, error: orderError } = await supabaseAdmin
         .from('orders')
         .insert({
           customer_id: orderData.customer_id,
           table_id: orderData.table_id,
+          order_number: orderNumber,
           items: orderData.items,
+          subtotal: orderData.total_amount,
           total_amount: orderData.total_amount,
           status: 'pending',
-          payment_status: 'pending'
+          payment_status: 'pending',
+          payment_method: 'payhere'
         })
         .select()
         .single();
